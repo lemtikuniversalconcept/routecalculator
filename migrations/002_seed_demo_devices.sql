@@ -1,0 +1,75 @@
+INSERT INTO services.infrastructure_devices (
+    org_id,
+    device_id,
+    type,
+    name,
+    lat,
+    lng,
+    floor,
+    building_id,
+    description,
+    capabilities,
+    default_state,
+    operational,
+    health_status
+)
+VALUES
+    (
+        '00000000-0000-0000-0000-000000000001',
+        'DEV-ELEV-001',
+        'SMART_ELEVATOR',
+        'Main Lobby Elevator',
+        6.42812000,
+        3.42194000,
+        0,
+        'BLDG-HOTEL-001',
+        'Primary elevator from lobby to guest floors',
+        '["hold_floor","send_to_floor","reserve_for_officers","normal"]'::jsonb,
+        'normal',
+        TRUE,
+        'healthy'
+    ),
+    (
+        '00000000-0000-0000-0000-000000000001',
+        'DEV-DOOR-EXIT-001',
+        'SMART_DOOR',
+        'Hotel North Exit',
+        6.42815000,
+        3.42185000,
+        0,
+        'BLDG-HOTEL-001',
+        'North exit door near service corridor',
+        '["unlock","lock","hold_open","hold_closed"]'::jsonb,
+        'locked',
+        TRUE,
+        'healthy'
+    ),
+    (
+        '00000000-0000-0000-0000-000000000001',
+        'DEV-LIGHT-001',
+        'TRAFFIC_LIGHT',
+        'Marina Road Signal',
+        6.42890000,
+        3.42240000,
+        NULL,
+        NULL,
+        'Road signal near the hotel corridor',
+        '["green_corridor","red_cross_traffic","normal"]'::jsonb,
+        'normal',
+        TRUE,
+        'healthy'
+    )
+ON CONFLICT (device_id) DO UPDATE SET
+    org_id = EXCLUDED.org_id,
+    type = EXCLUDED.type,
+    name = EXCLUDED.name,
+    lat = EXCLUDED.lat,
+    lng = EXCLUDED.lng,
+    floor = EXCLUDED.floor,
+    building_id = EXCLUDED.building_id,
+    description = EXCLUDED.description,
+    capabilities = EXCLUDED.capabilities,
+    default_state = EXCLUDED.default_state,
+    operational = EXCLUDED.operational,
+    health_status = EXCLUDED.health_status;
+

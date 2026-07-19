@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: lemtik-routecalculator-service
+    env: python
+    plan: starter
+    buildCommand: python -m pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: VALHALLA_URL
+        sync: false
+      - key: RADAR_SECRET_KEY
+        sync: false
+      - key: RADAR_PUBLISHABLE_KEY
+        sync: false
+      - key: RELATIONSHIP_API_URL
+        sync: false
+      - key: RELATIONSHIP_API_KEY
+        sync: false
+      - key: INFRASTRUCTURE_CORRIDOR_METRES
+        value: "100"
+      - key: MAX_OFFICERS_PER_ROUTE_QUERY
+        value: "20"
+      - key: VALHALLA_TIMEOUT_SECONDS
+        value: "5"
+      - key: ENVIRONMENT
+        value: production
