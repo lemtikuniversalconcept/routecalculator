@@ -1024,8 +1024,7 @@ class RouteStore:
 
     def _init_db(self) -> None:
         schema = """
-        create schema if not exists services;
-        create table if not exists services.infrastructure_devices (
+        create table if not exists infrastructure_devices (
             id uuid primary key default gen_random_uuid(),
             org_id text not null,
             device_id varchar(100) unique not null,
@@ -1049,7 +1048,7 @@ class RouteStore:
             created_at timestamptz default now(),
             updated_at timestamptz default now()
         );
-        create table if not exists services.route_history (
+        create table if not exists route_history (
             id uuid primary key default gen_random_uuid(),
             route_id varchar(100) unique not null,
             org_id text not null,
@@ -1072,7 +1071,7 @@ class RouteStore:
             created_at timestamptz default now(),
             updated_at timestamptz default now()
         );
-        create table if not exists services.infrastructure_action_log (
+        create table if not exists infrastructure_action_log (
             id uuid primary key default gen_random_uuid(),
             device_id varchar(100) not null,
             org_id text not null,
@@ -1094,7 +1093,7 @@ class RouteStore:
 
     def _seed_if_needed(self) -> None:
         with self._db_conn() as conn, conn.cursor() as cur:
-            cur.execute("select exists(select 1 from services.infrastructure_devices limit 1)")
+            cur.execute("select exists(select 1 from infrastructure_devices limit 1)")
             has_rows = bool(cur.fetchone()[0])
         if not has_rows:
             self._seed_db(DEFAULT_ORG_ID)
@@ -1104,7 +1103,7 @@ class RouteStore:
             for device in DEFAULT_DEVICE_SEED:
                 cur.execute(
                     """
-                    insert into services.infrastructure_devices (
+                    insert into infrastructure_devices (
                         org_id, device_id, type, name, lat, lng, floor, building_id,
                         description, capabilities, default_state, operational, created_at, updated_at
                     )
@@ -1142,7 +1141,7 @@ class RouteStore:
                            connection_protocol, connection_endpoint, auth_type, auth_key_reference,
                            capabilities, default_state, safety_constraints, operational, last_health_check,
                            health_status, created_at, updated_at
-                    from services.infrastructure_devices
+                    from infrastructure_devices
                     where org_id = %s
                     order by type, name
                     """,
@@ -1158,7 +1157,7 @@ class RouteStore:
                                connection_protocol, connection_endpoint, auth_type, auth_key_reference,
                                capabilities, default_state, safety_constraints, operational, last_health_check,
                                health_status, created_at, updated_at
-                        from services.infrastructure_devices
+                        from infrastructure_devices
                         where org_id = %s
                         order by type, name
                         """,
@@ -1178,7 +1177,7 @@ class RouteStore:
             with self._db_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:  # type: ignore[union-attr]
                 cur.execute(
                     """
-                    insert into services.infrastructure_devices (
+                    insert into infrastructure_devices (
                         org_id, device_id, type, name, lat, lng, floor, building_id, description,
                         capabilities, default_state, operational, created_at, updated_at
                     ) values (
@@ -1237,7 +1236,7 @@ class RouteStore:
             with self._db_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:  # type: ignore[union-attr]
                 cur.execute(
                     """
-                    insert into services.route_history (
+                    insert into route_history (
                         route_id, org_id, incident_id, officer_id, vehicle_id, routing_type,
                         origin_lat, origin_lng, destination_lat, destination_lng, distance_metres,
                         estimated_time_minutes, infrastructure_recommendations, route_geojson,
@@ -1321,7 +1320,7 @@ class RouteStore:
                 with self._db_conn() as conn, conn.cursor() as cur:  # type: ignore[union-attr]
                     cur.execute(
                         """
-                        insert into services.infrastructure_action_log (
+                        insert into infrastructure_action_log (
                             device_id, org_id, incident_id, route_id, recommended_action, approved,
                             executed, created_at
                         ) values (%s,%s,%s,%s,%s,%s,%s,now())
@@ -1345,7 +1344,7 @@ class RouteStore:
             return deep_copy(cached)
         if self.use_db:
             with self._db_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:  # type: ignore[union-attr]
-                cur.execute("select * from services.route_history where route_id = %s", (route_id,))
+                cur.execute("select * from route_history where route_id = %s", (route_id,))
                 row = cur.fetchone()
                 if not row:
                     return None
@@ -1369,7 +1368,7 @@ class RouteStore:
             with self._db_conn() as conn, conn.cursor() as cur:  # type: ignore[union-attr]
                 cur.execute(
                     """
-                    update services.route_history
+                    update route_history
                     set pushed_to_device = true, pushed_at = now(), updated_at = now()
                     where route_id = %s
                     """,
@@ -1512,6 +1511,7 @@ async def calculate_route(request: Request, _: None = Depends(validate_internal_
     devices = store.list_devices(org_id)
     route = build_route_response(payload, devices)
     route["org_id"] = org_id
+    route["incident"] = payload.incident.model_dump()
     stored = store.save_route(route)
     return {
         "request_id": payload.request_id,

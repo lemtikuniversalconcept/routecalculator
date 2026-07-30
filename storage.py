@@ -425,11 +425,10 @@ class PostgresStore:
     def _initialize(self) -> None:
         with self._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("CREATE SCHEMA IF NOT EXISTS services")
                 cur.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
                 cur.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS services.infrastructure_devices (
+                    CREATE TABLE IF NOT EXISTS infrastructure_devices (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         org_id UUID NOT NULL,
                         device_id VARCHAR(100) UNIQUE NOT NULL,
@@ -457,7 +456,7 @@ class PostgresStore:
                 )
                 cur.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS services.route_history (
+                    CREATE TABLE IF NOT EXISTS route_history (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         route_id VARCHAR(100) UNIQUE NOT NULL,
                         org_id UUID NOT NULL,
@@ -485,7 +484,7 @@ class PostgresStore:
                 )
                 cur.execute(
                     """
-                    CREATE TABLE IF NOT EXISTS services.infrastructure_action_log (
+                    CREATE TABLE IF NOT EXISTS infrastructure_action_log (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                         device_id VARCHAR(100) NOT NULL,
                         org_id UUID NOT NULL,
@@ -505,7 +504,7 @@ class PostgresStore:
                 )
                 cur.execute(
                     """
-                    CREATE OR REPLACE FUNCTION services.set_updated_at()
+                    CREATE OR REPLACE FUNCTION set_updated_at()
                     RETURNS TRIGGER
                     LANGUAGE plpgsql
                     AS $$
@@ -516,13 +515,13 @@ class PostgresStore:
                     $$;
                     """
                 )
-                cur.execute("DROP TRIGGER IF EXISTS trigger_infrastructure_devices_updated_at ON services.infrastructure_devices")
+                cur.execute("DROP TRIGGER IF EXISTS trigger_infrastructure_devices_updated_at ON infrastructure_devices")
                 cur.execute(
                     """
                     CREATE TRIGGER trigger_infrastructure_devices_updated_at
-                    BEFORE UPDATE ON services.infrastructure_devices
+                    BEFORE UPDATE ON infrastructure_devices
                     FOR EACH ROW
-                    EXECUTE FUNCTION services.set_updated_at()
+                    EXECUTE FUNCTION set_updated_at()
                     """
                 )
             conn.commit()
@@ -530,7 +529,7 @@ class PostgresStore:
             self.seed_demo_devices()
 
     def device_count(self) -> int:
-        row = self._fetchone("SELECT COUNT(*) AS count FROM services.infrastructure_devices")
+        row = self._fetchone("SELECT COUNT(*) AS count FROM infrastructure_devices")
         return int(row["count"]) if row else 0
 
     def seed_demo_devices(self) -> None:
@@ -605,7 +604,7 @@ class PostgresStore:
             "health_status": payload.get("health_status", "unknown"),
         }
         sql = """
-        INSERT INTO services.infrastructure_devices (
+        INSERT INTO infrastructure_devices (
             id, org_id, device_id, type, name, lat, lng, floor, building_id, description,
             connection_protocol, connection_endpoint, auth_type, auth_key_reference,
             capabilities, default_state, safety_constraints, operational, last_health_check, health_status
@@ -642,12 +641,12 @@ class PostgresStore:
         return self.get_device(device["device_id"]) or device
 
     def get_device(self, device_id: str) -> dict[str, Any] | None:
-        return self._fetchone("SELECT * FROM services.infrastructure_devices WHERE device_id = %s", (device_id,))
+        return self._fetchone("SELECT * FROM infrastructure_devices WHERE device_id = %s", (device_id,))
 
     def list_devices(self, org_id: str | None = None) -> list[dict[str, Any]]:
         if org_id:
-            return self._fetchall("SELECT * FROM services.infrastructure_devices WHERE org_id = %s ORDER BY created_at ASC, device_id ASC", (_stable_uuid(org_id),))
-        return self._fetchall("SELECT * FROM services.infrastructure_devices ORDER BY created_at ASC, device_id ASC")
+            return self._fetchall("SELECT * FROM infrastructure_devices WHERE org_id = %s ORDER BY created_at ASC, device_id ASC", (_stable_uuid(org_id),))
+        return self._fetchall("SELECT * FROM infrastructure_devices ORDER BY created_at ASC, device_id ASC")
 
     def save_route(self, payload: dict[str, Any]) -> dict[str, Any]:
         row = {
@@ -674,7 +673,7 @@ class PostgresStore:
             "response_payload": json.dumps(payload.get("response_payload", {})),
         }
         sql = """
-        INSERT INTO services.route_history (
+        INSERT INTO route_history (
             id, route_id, org_id, incident_id, officer_id, vehicle_id, routing_type,
             origin_lat, origin_lng, destination_lat, destination_lng, distance_metres,
             estimated_time_minutes, actual_time_minutes, infrastructure_recommendations,
@@ -715,7 +714,7 @@ class PostgresStore:
     def update_route_push(self, route_id: str, pushed_to_device: bool, pushed_at: str | None) -> None:
         self._execute(
             """
-            UPDATE services.route_history
+            UPDATE route_history
             SET pushed_to_device = %s, pushed_at = %s
             WHERE route_id = %s
             """,
@@ -723,12 +722,12 @@ class PostgresStore:
         )
 
     def get_route(self, route_id: str) -> dict[str, Any] | None:
-        return self._fetchone("SELECT * FROM services.route_history WHERE route_id = %s", (route_id,))
+        return self._fetchone("SELECT * FROM route_history WHERE route_id = %s", (route_id,))
 
     def list_routes(self, org_id: str | None = None) -> list[dict[str, Any]]:
         if org_id:
-            return self._fetchall("SELECT * FROM services.route_history WHERE org_id = %s ORDER BY created_at DESC", (org_id,))
-        return self._fetchall("SELECT * FROM services.route_history ORDER BY created_at DESC")
+            return self._fetchall("SELECT * FROM route_history WHERE org_id = %s ORDER BY created_at DESC", (org_id,))
+        return self._fetchall("SELECT * FROM route_history ORDER BY created_at DESC")
 
     def log_action(self, payload: dict[str, Any]) -> None:
         row = {
@@ -748,7 +747,7 @@ class PostgresStore:
         }
         self._execute(
             """
-            INSERT INTO services.infrastructure_action_log (
+            INSERT INTO infrastructure_action_log (
                 id, device_id, org_id, incident_id, route_id, recommended_action, approved,
                 approved_by, approved_at, executed, executed_at, reverted_at, execution_result
             ) VALUES (

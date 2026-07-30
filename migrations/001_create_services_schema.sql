@@ -1,8 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS services;
-
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-CREATE OR REPLACE FUNCTION services.set_updated_at()
+CREATE OR REPLACE FUNCTION set_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
@@ -12,7 +10,7 @@ BEGIN
 END;
 $$;
 
-CREATE TABLE IF NOT EXISTS services.infrastructure_devices (
+CREATE TABLE IF NOT EXISTS infrastructure_devices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id UUID NOT NULL,
     device_id VARCHAR(100) UNIQUE NOT NULL,
@@ -37,13 +35,13 @@ CREATE TABLE IF NOT EXISTS services.infrastructure_devices (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-DROP TRIGGER IF EXISTS trigger_infrastructure_devices_updated_at ON services.infrastructure_devices;
+DROP TRIGGER IF EXISTS trigger_infrastructure_devices_updated_at ON infrastructure_devices;
 CREATE TRIGGER trigger_infrastructure_devices_updated_at
-BEFORE UPDATE ON services.infrastructure_devices
+BEFORE UPDATE ON infrastructure_devices
 FOR EACH ROW
-EXECUTE FUNCTION services.set_updated_at();
+EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE IF NOT EXISTS services.route_history (
+CREATE TABLE IF NOT EXISTS route_history (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     route_id VARCHAR(100) UNIQUE NOT NULL,
     org_id UUID NOT NULL,
@@ -68,7 +66,7 @@ CREATE TABLE IF NOT EXISTS services.route_history (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS services.infrastructure_action_log (
+CREATE TABLE IF NOT EXISTS infrastructure_action_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     device_id VARCHAR(100) NOT NULL,
     org_id UUID NOT NULL,
@@ -85,10 +83,9 @@ CREATE TABLE IF NOT EXISTS services.infrastructure_action_log (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_infrastructure_devices_org_id ON services.infrastructure_devices (org_id);
-CREATE INDEX IF NOT EXISTS idx_infrastructure_devices_building_id ON services.infrastructure_devices (building_id);
-CREATE INDEX IF NOT EXISTS idx_route_history_org_id ON services.route_history (org_id);
-CREATE INDEX IF NOT EXISTS idx_route_history_incident_id ON services.route_history (incident_id);
-CREATE INDEX IF NOT EXISTS idx_action_log_org_id ON services.infrastructure_action_log (org_id);
-CREATE INDEX IF NOT EXISTS idx_action_log_route_id ON services.infrastructure_action_log (route_id);
-
+CREATE INDEX IF NOT EXISTS idx_infrastructure_devices_org_id ON infrastructure_devices (org_id);
+CREATE INDEX IF NOT EXISTS idx_infrastructure_devices_building_id ON infrastructure_devices (building_id);
+CREATE INDEX IF NOT EXISTS idx_route_history_org_id ON route_history (org_id);
+CREATE INDEX IF NOT EXISTS idx_route_history_incident_id ON route_history (incident_id);
+CREATE INDEX IF NOT EXISTS idx_action_log_org_id ON infrastructure_action_log (org_id);
+CREATE INDEX IF NOT EXISTS idx_action_log_route_id ON infrastructure_action_log (route_id);

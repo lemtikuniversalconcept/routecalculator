@@ -1,6 +1,4 @@
-create schema if not exists services;
-
-create table if not exists services.infrastructure_devices (
+create table if not exists infrastructure_devices (
     id uuid primary key default gen_random_uuid(),
     org_id text not null,
     device_id varchar(100) unique not null,
@@ -25,7 +23,7 @@ create table if not exists services.infrastructure_devices (
     updated_at timestamptz default now()
 );
 
-create table if not exists services.route_history (
+create table if not exists route_history (
     id uuid primary key default gen_random_uuid(),
     route_id varchar(100) unique not null,
     org_id text not null,
@@ -49,7 +47,7 @@ create table if not exists services.route_history (
     updated_at timestamptz default now()
 );
 
-create table if not exists services.infrastructure_action_log (
+create table if not exists infrastructure_action_log (
     id uuid primary key default gen_random_uuid(),
     device_id varchar(100) not null,
     org_id text not null,

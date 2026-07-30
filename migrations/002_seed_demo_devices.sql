@@ -1,4 +1,4 @@
-INSERT INTO services.infrastructure_devices (
+INSERT INTO infrastructure_devices (
     org_id,
     device_id,
     type,
@@ -72,4 +72,3 @@ ON CONFLICT (device_id) DO UPDATE SET
     default_state = EXCLUDED.default_state,
     operational = EXCLUDED.operational,
     health_status = EXCLUDED.health_status;
-
