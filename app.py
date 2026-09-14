@@ -152,6 +152,51 @@ def pseudo_position(identifier: str) -> dict[str, float]:
     }
 
 
+def fetch_real_positions(
+    org_id: str, officer_ids: list[str], vehicle_ids: list[str]
+) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, float]]]:
+    """Officer/vehicle GPS is already collected and stored by the platform's own
+    mobile-app/dashboard location updates - it lands in the same officers/vehicles
+    tables inventoryservices and proximity already read (current_lat/current_lng).
+    Radar.io was never actually wired into a live position lookup anywhere in this
+    file (RADAR_SECRET_KEY/RADAR_PUBLISHABLE_KEY were only read for health-check
+    status reporting) - candidates were always placed at a deterministic-but-fake
+    hash-derived point near central Lagos regardless of where the responder
+    actually was. Reading real positions from the shared database costs nothing
+    extra (same DATABASE_URL this service already holds) and is strictly more
+    accurate than either the fake positions or a paid tracking service duplicating
+    data this platform already collects."""
+    officer_positions: dict[str, dict[str, float]] = {}
+    vehicle_positions: dict[str, dict[str, float]] = {}
+    if not (DATABASE_URL and psycopg2 is not None):
+        return officer_positions, vehicle_positions
+    try:
+        conn = psycopg2.connect(DATABASE_URL, connect_timeout=5, sslmode="require")
+        try:
+            with conn.cursor() as cur:
+                if officer_ids:
+                    cur.execute(
+                        "SELECT officer_id, current_lat, current_lng FROM officers WHERE org_id = %s AND officer_id = ANY(%s)",
+                        (org_id, officer_ids),
+                    )
+                    for identifier, lat, lng in cur.fetchall():
+                        if lat is not None and lng is not None:
+                            officer_positions[str(identifier)] = {"lat": float(lat), "lng": float(lng)}
+                if vehicle_ids:
+                    cur.execute(
+                        "SELECT vehicle_id, current_lat, current_lng FROM vehicles WHERE org_id = %s AND vehicle_id = ANY(%s)",
+                        (org_id, vehicle_ids),
+                    )
+                    for identifier, lat, lng in cur.fetchall():
+                        if lat is not None and lng is not None:
+                            vehicle_positions[str(identifier)] = {"lat": float(lat), "lng": float(lng)}
+        finally:
+            conn.close()
+    except Exception:
+        return {}, {}
+    return officer_positions, vehicle_positions
+
+
 def route_geometry(points: list[dict[str, float]]) -> dict[str, Any]:
     return {
         "type": "FeatureCollection",
@@ -664,11 +709,13 @@ def closest_candidates(
     incident: dict[str, Any],
     responders: list[str],
     limit: int,
+    positions: dict[str, dict[str, float]] | None = None,
 ) -> list[tuple[str, float, dict[str, float]]]:
     location = incident["location"]
+    positions = positions or {}
     result: list[tuple[str, float, dict[str, float]]] = []
     for responder_id in responders[: max(1, limit)]:
-        pos = pseudo_position(responder_id)
+        pos = positions.get(responder_id) or pseudo_position(responder_id)
         distance = haversine_metres(location["lat"], location["lng"], pos["lat"], pos["lng"])
         result.append((responder_id, distance, pos))
     return sorted(result, key=lambda item: item[1])
@@ -843,8 +890,13 @@ def build_route_response(
     indoor = bool(incident.get("indoor") if incident.get("indoor") is not None else incident_location.get("indoor"))
     route_type = next(iter(route_type_candidates(request)))
 
-    officer_candidates = closest_candidates(incident, request.responders.officers, MAX_OFFICERS_PER_ROUTE_QUERY)
-    vehicle_candidates = closest_candidates(incident, request.responders.vehicles, MAX_OFFICERS_PER_ROUTE_QUERY)
+    officer_positions, vehicle_positions = fetch_real_positions(
+        request.org_id,
+        request.responders.officers[:MAX_OFFICERS_PER_ROUTE_QUERY],
+        request.responders.vehicles[:MAX_OFFICERS_PER_ROUTE_QUERY],
+    )
+    officer_candidates = closest_candidates(incident, request.responders.officers, MAX_OFFICERS_PER_ROUTE_QUERY, officer_positions)
+    vehicle_candidates = closest_candidates(incident, request.responders.vehicles, MAX_OFFICERS_PER_ROUTE_QUERY, vehicle_positions)
     push_route_to_officers = [item[0] for item in officer_candidates[: max(1, min(2, len(officer_candidates)))]] or request.responders.officers[:1]
 
     routes: list[dict[str, Any]] = []
